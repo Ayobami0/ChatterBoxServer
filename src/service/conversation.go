@@ -16,8 +16,40 @@ type ConversationService struct {
 	r c.ConversationRepository
 }
 
-func (s *ConversationService) CreateConversation(conv model.ConversationCreate, creator *model.User) (*model.Conversation, error) {
+func (s *ConversationService) ConversationRequests(cID string) ([]model.Request, error) {
+  return s.r.GetRequests(cID)
+}
 
+func (s *ConversationService) ConversationJoin(cID, fromID string) (error) {
+	id, err := uuid.NewUUID()
+
+	if err != nil {
+		return err
+	}
+  
+  nRequest := model.Request{
+    RequestBase: model.RequestBase{
+      FromID: fromID,
+      ConversationId: &cID,
+    },
+    ID: id.String(),
+  }
+  return s.r.CreateConversationRequest(cID, nRequest)
+}
+
+func (s *ConversationService) ConversationRequestReject(cID, reqID string) (error) {
+  return s.r.RejectRequest(cID, reqID)
+}
+
+func (s *ConversationService) ConversationRequestAccept(cID, reqID string) (error) {
+  return s.r.AcceptRequest(cID, reqID)
+}
+
+func (s *ConversationService) DeleteConversation(cID string) (error) {
+  return s.r.DeleteConversation(cID)
+}
+
+func (s *ConversationService) CreateConversation(conv model.ConversationCreate, creator *model.User) (*model.Conversation, error) {
 	if conv.Name == "" {
 		return nil, errors.ErrMissingContent("name")
 	}

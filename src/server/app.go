@@ -50,10 +50,10 @@ func App(config AppConfig) (*echo.Echo, error) {
 
 	auth.POST(constant.CONVERSATION_CREATE_ENDPOINT, c_handler.ConversationCreate)
 	auth.GET(constant.CONVERSATION_REQUEST_ENDPOINT, c_handler.ConversationsRequestsGet)
-	auth.POST(constant.CONVERSATION_JOIN_ENDPOINT, c_handler.ConversationJoin)
+	auth.PUT(constant.CONVERSATION_JOIN_ENDPOINT, c_handler.ConversationJoin)
 	auth.DELETE(constant.CONVERSATION_DELETE_ENDPOINT, c_handler.ConversationDelete)
-	auth.PUT(constant.CONVERSATION_REQUEST_ACCEPT, c_handler.ConversationAccept)
-	auth.PUT(constant.CONVERSATION_REQUEST_REJECT, c_handler.ConversationReject)
+	auth.PATCH(constant.CONVERSATION_REQUEST_ACCEPT, c_handler.ConversationAccept)
+	auth.PATCH(constant.CONVERSATION_REQUEST_REJECT, c_handler.ConversationReject)
 	auth.GET(constant.CONVERSATION_GET_ENDPOINT, c_handler.ConversationGet)
 
 	auth.GET(constant.USER_GET_ENDPOINT, u_handler.UsersGet)

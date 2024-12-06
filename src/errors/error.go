@@ -68,4 +68,6 @@ func (e ErrNoSuchRequest) Error() string {
 
 var (
   ErrRequestNotExist = errors.New("request does't exist")
+  ErrConvertationPrivate = errors.New("cannot join private conversation")
+  ErrMemberNotAdmin = errors.New("member is not an admin")
 )

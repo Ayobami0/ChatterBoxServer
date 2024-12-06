@@ -1,8 +1,10 @@
 package conversation
 
 import (
+	"errors"
 	"fmt"
 
+	e "github.com/Ayobami0/chatter_box_server/src/errors"
 	"github.com/Ayobami0/chatter_box_server/src/model"
 	"gorm.io/gorm"
 )
@@ -20,48 +22,228 @@ func (c *GormConversationRepository) CreateConversation(conversation *model.Conv
 }
 
 func (c *GormConversationRepository) DeleteConversation(id string) error {
-	return c.DB.Select("Messages").Delete(&model.Conversation{}, id).Error
+	err := c.DB.Delete(&model.Conversation{}, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *GormConversationRepository) UpdateConversation(update *model.Conversation) error {
-	return c.DB.Model(&model.Conversation{}).Updates(update).Error
+	err := c.DB.Model(&model.Conversation{}).Updates(update).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(update.ID)
+		default:
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *GormConversationRepository) AddMessage(id string, message model.Message) error {
-	return c.DB.Model(&model.Conversation{}).Where(&model.Conversation{ID: id}).Association("Messages").Append(&message)
+	var conversation model.Conversation
+	err := c.DB.Find(&conversation, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+
+	return c.DB.Model(&conversation).Association("Messages").Append(&message)
 }
 
 func (c *GormConversationRepository) DeleteMessage(id string, message model.Message) error {
-	return c.DB.Model(&model.Conversation{}).Where(&model.Conversation{ID: id}).Association("Messages").Delete(&message)
-}
+	var conversation model.Conversation
+	err := c.DB.Find(&conversation, "id = ?", id).Error
 
-func (c *GormConversationRepository) AddRequest(id string, request model.Request) error {
-	return c.DB.Model(&model.Conversation{}).Where(&model.Conversation{ID: id}).Association("Requests").Append(&request)
-}
-
-func (c *GormConversationRepository) AcceptRequest(id string, request model.Request) error {
-	model := c.DB.Model(&model.Conversation{}).Where(&model.Conversation{ID: id})
-	if err := model.Association("Messages").Delete(&request); err != nil {
-		return err
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
 	}
 
-	return model.Association("Members").Append(&request.User)
+	return c.DB.Model(&conversation).Association("Messages").Delete(&message)
 }
 
-func (c *GormConversationRepository) RejectRequest(id string, request model.Request) error {
-	return c.DB.Model(&model.Conversation{}).Association("Messages").Delete(&request)
+func (c *GormConversationRepository) AcceptRequest(id, rID string) error {
+	var conversation model.Conversation
+	err := c.DB.Find(&conversation, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+  request := model.Request{
+    ID: rID,
+    RequestBase: model.RequestBase{
+      ConversationId: &id,
+    },
+  }
+
+  err = c.DB.Model(&conversation).Association("Requests").Delete(&request)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+
+	return c.DB.Model(&conversation).Association("Members").Append(&request.User)
+}
+
+func (c *GormConversationRepository) RemoveMember(id, uID string) error {
+	var conversation model.Conversation
+	err := c.DB.Find(&conversation, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+
+	user := model.User{
+		ID: uID,
+	}
+
+	return c.DB.Model(&conversation).Association("Members").Delete(&user)
+}
+
+func (c *GormConversationRepository) RejectRequest(id, rID string) error {
+	var conversation model.Conversation
+
+	err := c.DB.Find(&conversation, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+
+  request := model.Request{
+    ID: rID,
+    RequestBase: model.RequestBase{
+      ConversationId: &id,
+    },
+  }
+
+  err = c.DB.Model(&conversation).Association("Requests").Delete(&request)
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+
+  return nil
+}
+
+func (c *GormConversationRepository) CreateConversationRequest(id string, request model.Request) error {
+	var conversation model.Conversation
+
+	err := c.DB.Find(&conversation, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return e.ErrNoSuchConversation(id)
+		default:
+			return err
+		}
+	}
+
+
+  return c.DB.Model(&conversation).Association("Requests").Append(&request)
 }
 
 func (c *GormConversationRepository) QueryConversations(q string, page, count int, all bool) ([]model.Conversation, error) {
 	var conversations []model.Conversation
 
-	res := c.DB.Preload("Members").Preload("Messages").Limit(count).Offset((page - 1) * count)
+	res := c.DB.Preload("Members").Limit(count).Offset((page - 1) * count)
 
 	if all {
-		res = res.Find(&conversations)
+		res = res.Find(&conversations, "type = ?", "GROUP")
 	} else {
-		res = res.Find(&conversations, "name LIKE ?", fmt.Sprintf("%%%s%%", q))
+		res = res.Find(&conversations, "name LIKE ? AND type = ?", fmt.Sprintf("%%%s%%", q), "GROUP")
 	}
 
 	return conversations, res.Error
+}
+
+func (c *GormConversationRepository) GetRequests(id string) ([]model.Request, error) {
+	var conversation model.Conversation
+	var requests []model.Request
+	err := c.DB.Find(&conversation, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return nil, e.ErrNoSuchConversation(id)
+		default:
+			return nil, err
+		}
+	}
+
+	err = c.DB.Model(&conversation).Preload("Conversation").Preload("From").Association("Requests").Find(&requests)
+	if err != nil {
+		return nil, err
+	}
+
+	return requests, nil
+
+}
+
+
+func (c *GormConversationRepository) GetMessages(id string) ([]model.Message, error) {
+	var conversation model.Conversation
+  var messages []model.Message
+	err := c.DB.Find(&conversation, "id = ?", id).Error
+
+	if err != nil {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			return nil, e.ErrNoSuchConversation(id)
+		default:
+			return nil, err
+		}
+	}
+
+  err = c.DB.Model(&conversation).Preload("Messages").Association("Messages").Find(&messages)
+	if err != nil {
+		return nil, err
+	}
+
+  return messages, nil
 }

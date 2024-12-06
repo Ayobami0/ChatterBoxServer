@@ -7,6 +7,7 @@ import (
 	app_err "github.com/Ayobami0/chatter_box_server/src/errors"
 	"github.com/Ayobami0/chatter_box_server/src/model"
 	"github.com/Ayobami0/chatter_box_server/src/service"
+	"github.com/Ayobami0/chatter_box_server/src/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
@@ -29,7 +30,7 @@ func (ch *ConversationHandler) ConversationCreate(c echo.Context) error {
 	nConversation := new(model.ConversationCreate)
 
 	if err := c.Bind(nConversation); err != nil {
-		return c.String(http.StatusBadRequest, "bad request")
+		return utils.ErrorJson(c, http.StatusBadRequest, "bad request")
 	}
 
 	conversation, err := ch.s.CreateConversation(*nConversation, &user)
@@ -37,18 +38,14 @@ func (ch *ConversationHandler) ConversationCreate(c echo.Context) error {
 	if err != nil {
 		switch err.(type) {
 		case app_err.ErrMissingContent:
-			return c.String(http.StatusBadRequest, err.Error())
+			return utils.ErrorJson(c, http.StatusBadRequest, err.Error())
 		case app_err.ErrTypeNotSupported:
-			return c.String(http.StatusBadRequest, err.Error())
+			return utils.ErrorJson(c, http.StatusBadRequest, err.Error())
 		}
-		return c.String(http.StatusBadRequest, "bad request")
+		return utils.ErrorJson(c, http.StatusBadRequest, "bad request")
 	}
 
 	return c.JSON(http.StatusCreated, conversation)
-}
-
-func (ch *ConversationHandler) ConversationDelete(c echo.Context) error {
-	return c.String(http.StatusOK, "DELETE CONV")
 }
 
 func (ch *ConversationHandler) ConversationGet(c echo.Context) error {
@@ -67,28 +64,91 @@ func (ch *ConversationHandler) ConversationGet(c echo.Context) error {
 	conversations, err := ch.s.QueryConversationsByName(search, page, count)
 
 	if err != nil {
-		return c.String(http.StatusInternalServerError, err.Error())
+		return utils.ErrorJson(c, http.StatusInternalServerError, err.Error())
 	}
 
 	return c.JSON(http.StatusOK, conversations)
 }
 
-func (ch *ConversationHandler) ConversationsRequestsGet(c echo.Context) error {
+func (ch *ConversationHandler) ConversationDelete(c echo.Context) error {
+  id := c.Param("id")
+
+  err := ch.s.DeleteConversation(id)
+
+	if err != nil {
+		switch err.(type) {
+		case app_err.ErrNoSuchConversation:
+			return utils.ErrorJson(c, http.StatusBadRequest, err.Error())
+    }
+		return utils.ErrorJson(c, http.StatusBadRequest, "bad request")
+	}
 	return c.String(http.StatusOK, "")
+}
+
+func (ch *ConversationHandler) ConversationsRequestsGet(c echo.Context) error {
+  id := c.Param("id")
+
+  convs, err := ch.s.ConversationRequests(id)
+
+	if err != nil {
+		switch err.(type) {
+		case app_err.ErrNoSuchConversation:
+			return utils.ErrorJson(c, http.StatusBadRequest, err.Error())
+    }
+		return utils.ErrorJson(c, http.StatusBadRequest, "bad request")
+	}
+	return c.JSON(http.StatusOK, convs)
 }
 
 func (ch *ConversationHandler) ConversationJoin(c echo.Context) error {
-	return c.String(http.StatusOK, "")
-}
+  user := c.Get("user").(*jwt.Token)
+  claim := user.Claims.(*service.UserAccountClaim)
 
-func (ch *ConversationHandler) ConversationInvite(c echo.Context) error {
+  id := c.Param("id")
+
+  err := ch.s.ConversationJoin(id, claim.UserId)
+
+	if err != nil {
+		switch err.(type) {
+		case app_err.ErrNoSuchConversation:
+			return utils.ErrorJson(c, http.StatusBadRequest, err.Error())
+    }
+		return utils.ErrorJson(c, http.StatusBadRequest, "bad request")
+	}
+
 	return c.String(http.StatusOK, "")
 }
 
 func (ch *ConversationHandler) ConversationReject(c echo.Context) error {
+  cID := c.Param("cid")
+  rID := c.Param("rid")
+
+  err := ch.s.ConversationRequestReject(cID, rID)
+
+	if err != nil {
+		switch err.(type) {
+		case app_err.ErrNoSuchConversation:
+			return utils.ErrorJson(c, http.StatusBadRequest, err.Error())
+    }
+		return utils.ErrorJson(c, http.StatusBadRequest, "bad request")
+	}
+
 	return c.String(http.StatusOK, "")
 }
 
 func (ch *ConversationHandler) ConversationAccept(c echo.Context) error {
+  cID := c.Param("cid")
+  rID := c.Param("rid")
+
+  err := ch.s.ConversationRequestAccept(cID, rID)
+
+	if err != nil {
+		switch err.(type) {
+		case app_err.ErrNoSuchConversation:
+			return utils.ErrorJson(c, http.StatusBadRequest, err.Error())
+    }
+		return utils.ErrorJson(c, http.StatusBadRequest, "bad request")
+	}
+
 	return c.String(http.StatusOK, "")
 }
