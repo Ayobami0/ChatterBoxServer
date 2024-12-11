@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"github.com/Ayobami0/chatter_box_server/src/constant"
 	"github.com/Ayobami0/chatter_box_server/src/errors"
 	"github.com/Ayobami0/chatter_box_server/src/model"
@@ -14,6 +16,28 @@ func NewConversationService(r c.ConversationRepository) *ConversationService {
 
 type ConversationService struct {
 	r c.ConversationRepository
+}
+
+func (s *ConversationService) AddMessage(cId string, message model.MessageCreate) (*model.Message, error) {
+	id, err := uuid.NewUUID()
+
+	if err != nil {
+		return nil, err
+	}
+
+  nMessage := model.Message{
+    MessageBase: message.MessageBase,
+    ID: id.String(),
+    CreatedAt: time.Now(),
+  }
+
+  err = s.r.AddMessage(cId, nMessage)
+
+  if err != nil {
+    return nil, err
+  }
+
+  return &nMessage, nil
 }
 
 func (s *ConversationService) ConversationRequests(cID string) ([]model.Request, error) {

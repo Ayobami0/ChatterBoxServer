@@ -55,8 +55,10 @@ func (c *GormConversationRepository) AddMessage(id string, message model.Message
 	var conversation model.Conversation
 	err := c.DB.Find(&conversation, "id = ?", id).Error
 
-	if err != nil {
+	if err != nil || conversation.ID == "" {
 		switch {
+    case conversation.ID == "":
+      fallthrough
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			return e.ErrNoSuchConversation(id)
 		default:
